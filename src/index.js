@@ -6,8 +6,7 @@ import {
     TouchableOpacity,
     ScrollView,
     Platform,
-    TextInput,
-    Dimensions,
+    TextInput
 } from 'react-native';
 
 // PR: https://github.com/hossein-zare/react-native-dropdown-picker/pull/132
@@ -47,10 +46,10 @@ class DropDownPicker extends React.Component {
         }
 
         this.state = {
-               choice: props.multiple ? items : {
-                label: choice !== undefined ? choice.label : null,
-                value: choice !== undefined ? choice.value : null,
-                icon: choice !== undefined ? choice.icon : null,
+            choice: props.multiple ? items : {
+                label: choice.label,
+                value: choice.value,
+                icon: choice.icon
             },
             searchableText: null,
             isVisible: props.isVisible,
@@ -60,9 +59,7 @@ class DropDownPicker extends React.Component {
                 isVisible: props.isVisible
             },
             initialScroll: props?.autoScrollToDefaultValue,
-            defaultValueIndex,
-            top: 0,
-            direction: 'top',
+            defaultValueIndex
         };
         this.dropdownCoordinates = [];
     }
@@ -102,7 +99,7 @@ class DropDownPicker extends React.Component {
                props: {
                    ...state.props,
                    defaultValue: props.defaultValue
-               }
+               } 
             }
         }
 
@@ -154,7 +151,6 @@ class DropDownPicker extends React.Component {
     reset() {
         const item = this.props.multiple ? [] : this.null();
         this.props.onChangeItem(item, -1);
-        if (this.props.multiple) this.props.onChangeItemMultiple(item)
     }
 
     null() {
@@ -165,31 +161,16 @@ class DropDownPicker extends React.Component {
         }
     }
 
-    async toggle() {
-
-        const [, positionY] = await new Promise((resolve) =>
-            this.layoutRef.measureInWindow((...rect) => resolve(rect)),
-        );
-
-        const screenHeight = Dimensions.get('window').height;
-        const dropdownHeight = this.props.dropDownMaxHeight;
-
-        const lowestPointOfDropdown =
-            positionY + // Position in window
-            this.state.top + // Size of input
-            dropdownHeight + // Height of dropdown
-            this.props.bottomOffset; // Extra space, if we have bottom tab or something
-
+    toggle() {
         this.setState({
             isVisible: ! this.state.isVisible,
-            direction: lowestPointOfDropdown < screenHeight ? 'top' : 'bottom',
         }, () => {
             const isVisible = this.state.isVisible;
             if (isVisible) {
-            this.open(false);
-          } else {
-            this.close(false);
-          }
+        		this.open(false);
+        	} else {
+        		this.close(false);
+        	}
         });
     }
 
@@ -301,41 +282,46 @@ class DropDownPicker extends React.Component {
     select(item) {
         const { multiple } = this.state.props;
         if (! multiple) {
+            if (! item.unselectable) {
+                this.setState({
+                    choice: {
+                        label: item.label,
+                        value: item.value,
+                        icon: item.icon
+                    },
+                    searchableText: null
+                });
+            }
+
             this.setState({
-                choice: {
-                    label: item.label,
-                    value: item.value,
-                    icon: item.icon
-                },
                 isVisible: false,
                 props: {
                     ...this.state.props,
                     isVisible: false
                 },
-                searchableText: null
             });
-
             const index = this.props.items.findIndex(i => i.value === item.value);
 
             // onChangeItem callback
             this.props.onChangeItem(item, index);
         } else {
-            let choice = [...this.state.choice];
-            const exists = choice.findIndex(i => i.label === item.label && i.value === item.value);
+            if (! item.unselectable) {
+                let choice = [...this.state.choice];
+                const exists = choice.findIndex(i => i.label === item.label && i.value === item.value);
 
-            if (exists > -1 && choice.length > this.props.min) {
-                choice = choice.filter(i => i.label !== item.label && i.value !== item.value);
-            } else if (exists === -1 && choice.length < this.props.max) {
-                choice.push(item);
+                if (exists > -1 && choice.length > this.props.min) {
+                    choice = choice.filter(i => i.label !== item.label && i.value !== item.value);
+                } else if (exists === -1 && choice.length < this.props.max) {
+                    choice.push(item);
+                }
+
+                this.setState({
+                    choice
+                });
             }
-
-            this.setState({
-                choice
-            });
 
             // onChangeItem callback
             this.props.onChangeItem(choice.map(i => i.value));
-            this.props.onChangeItemMultiple(choice);
         }
 
         // onClose callback (! multiple)
@@ -389,7 +375,7 @@ class DropDownPicker extends React.Component {
         } else {
             return item;
         }
-
+        
         let len2 = label.length;
         return label + (len !== len2 ? '...' : '');
     }
@@ -400,30 +386,6 @@ class DropDownPicker extends React.Component {
 
     concatNums(num1, num2) {
         return Number(String(num1) + String(num2));
-    }
-
-    adjustStylesToDirection(...presets) {
-        let merged = Object.assign({}, ...presets);
-
-        // if we show dropdown box above, we need to invert border radius
-        if (this.state.direction === 'bottom') {
-            const {
-                borderBottomLeftRadius = 0,
-                borderBottomRightRadius = 0,
-                borderTopLeftRadius = 0,
-                borderTopRightRadius = 0,
-            } = merged;
-
-            merged = {
-                ...merged,
-                borderBottomLeftRadius: borderTopLeftRadius,
-                borderBottomRightRadius: borderTopRightRadius,
-                borderTopLeftRadius: borderBottomLeftRadius,
-                borderTopRightRadius: borderBottomRightRadius,
-            };
-        }
-
-        return merged;
     }
 
     renderItem(item, index, itemsLength) {
@@ -522,23 +484,19 @@ class DropDownPicker extends React.Component {
                   zIndex: this.props.zIndex
               })
 
-            }]}
-                {...this.props.containerProps}>
+            }]} {...this.props.containerProps}>
                 <TouchableOpacity
                     onLayout={(event) => this.getLayout(event.nativeEvent.layout)}
-                    ref={(ref) => (this.layoutRef = ref)}
                     disabled={disabled}
                     onPress={() => this.toggle()}
                     activeOpacity={1}
                     style={[
-                        this.adjustStylesToDirection(
-                            styles.dropDown,
-                            {
-                                flexDirection: 'row', flex: 1
-                            },
-                            this.props.style,
-                            (this.state.isVisible && this.props.noBottomRadius) && styles.noBottomRadius,
-                        ),
+                        styles.dropDown,
+                        {
+                            flexDirection: 'row', flex: 1
+                        },
+                        this.props.style,
+                        this.state.isVisible && styles.noBottomRadius
                     ]}
                 >
 
@@ -575,15 +533,11 @@ class DropDownPicker extends React.Component {
                     )}
                 </TouchableOpacity>
                 <View style={[
-                    this.adjustStylesToDirection(
-                        styles.dropDown,
-                        styles.dropDownBox,
-                        this.props.noTopRadius && styles.noTopRadius,
-                        this.props.dropDownStyle,
-                    ),
-
+                    styles.dropDown,
+                    styles.dropDownBox,
+                    this.props.dropDownStyle,
                     ! this.state.isVisible && styles.hidden, {
-                        [this.state.direction]: this.state.top,
+                        top: this.state.top,
                         maxHeight: this.props.dropDownMaxHeight,
                         zIndex: this.props.zIndex
                     }
@@ -616,7 +570,7 @@ class DropDownPicker extends React.Component {
                             this.scrollViewRef = ref;
                         }}
                         {...scrollViewProps}>
-                        {items.length > 0 ? items.map((item, index) =>
+                        {items.length > 0 ? items.map((item, index) => 
                             this.renderItem(item, index, items.length)
                         ) : (
                             <View style={styles.notFound}>
@@ -672,15 +626,11 @@ DropDownPicker.defaultProps = {
     containerProps: {},
     globalTextStyle: {},
     childrenContainerStyle: {},
-    noTopRadius: true,
-    noBottomRadius: true,
-    bottomOffset: 0,
     renderSeperator: () => {},
     controller: () => {},
     onOpen: () => {},
     onClose: () => {},
     onChangeItem: () => {},
-    onChangeItemMultiple: () => {},
     onChangeList: () => {},
 };
 
@@ -710,6 +660,8 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         position: 'absolute',
         width: '100%',
+        borderTopLeftRadius: 0,
+        borderTopRightRadius: 0,
     },
     dropDownItem: {
         paddingVertical: 8,
@@ -718,21 +670,17 @@ const styles = StyleSheet.create({
         justifyContent: 'center'
     },
     input: {
-        flex: 1,
-        borderColor: '#dfdfdf',
-        borderBottomWidth: 1,
-        paddingHorizontal: 0,
-        paddingVertical: 8,
-        marginBottom: 10,
+      flex: 1,
+      borderColor: '#dfdfdf',
+      borderBottomWidth: 1,
+      paddingHorizontal: 0,
+      paddingVertical: 8,
+      marginBottom: 10,
     },
     hidden: {
         position: 'relative',
         display: 'none',
         borderWidth: 0
-    },
-    noTopRadius: {
-        borderTopLeftRadius: 0,
-        borderTopRightRadius: 0,
     },
     noBottomRadius: {
         borderBottomLeftRadius: 0,
